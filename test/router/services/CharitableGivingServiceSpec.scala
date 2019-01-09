@@ -15,13 +15,13 @@
  */
 
 package router.services
-import config.{AppConfig, FeatureSwitch}
+
 import mocks.config.MockAppConfig
-import mocks.connectors.MockCharitableGivingConnector
-import router.constants.Versions.{VERSION_1, VERSION_2}
+import mocks.connectors.{MockCharitableGivingConnector, MockSelfAssessmentConnector}
 import play.api.Configuration
 import play.api.libs.json.Json
 import play.api.test.FakeRequest
+import router.constants.Versions.VERSION_2
 import router.errors.{IncorrectAPIVersion, UnsupportedAPIVersion}
 import support.UnitSpec
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse}
@@ -29,76 +29,64 @@ import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse}
 import scala.concurrent.Future
 
 class CharitableGivingServiceSpec extends UnitSpec
-  with MockCharitableGivingConnector with MockAppConfig {
+  with MockCharitableGivingConnector with MockAppConfig with MockSelfAssessmentConnector {
 
   class Setup {
 
     object service extends CharitableGivingService(
       mockAppConfig,
-      mockCharitableGivingConnector
+      mockCharitableGivingConnector,
+      mockSelfAssessmentConnector
     )
+
   }
 
   implicit val request = FakeRequest()
-//"charitable-giving-version-2.enabled"
+
   "amend" should {
     val requestBody = Json.obj("test" -> "body")
 
     "return a HttpResponse" when {
-      "the request contains a version 1.0 header and release-2 config is disabled" in new Setup {
+      "the request contains a version 1.0 header and charitable-giving-version-2 config is disabled" in new Setup {
         implicit val hc = HeaderCarrier(extraHeaders = Seq(ACCEPT -> "application/vnd.hmrc.1.0+json"))
         val response = HttpResponse(200)
-        val release2EnabledConfig = Configuration("charitable-giving-version-2.enabled" -> false)
-        MockAppConfig.featureSwitch returns Some(release2EnabledConfig)
+        val charitableGivingVersionTwoConfig = Configuration("charitable-giving-version-2.enabled" -> false)
 
-
-        println("E1: " + request.uri)
-        println("E2: " + requestBody)
-        println("E3: " + request)
-
-
-        MockCharitableGivingConnector.put(request.uri, requestBody)
-          .returns(Future.successful(Right(response)))
-
-
-        // val mockRes = mockCharitableGivingConnector.put("${req.uri}", requestBody)
-
-        // charitableGivingConnector.put("${req.uri}", body)(convertHeaderToVersion1, req)
-
-        println("mockAppConfig " + FeatureSwitch(mockAppConfig.featureSwitch).isCharitableGivingV2Enabled)
+        MockAppConfig.featureSwitch returns Some(charitableGivingVersionTwoConfig)
+        MockSelfAssessmentConnector.put(request.uri, requestBody).returns(Future.successful(Right(response)))
 
         val result = await(service.put(requestBody))
         result shouldBe Right(response)
       }
 
-      "the request contains a version 1.0 header and release-2 config is enabled" in new Setup {
+      "the request contains a version 1.0 header and charitable-giving-version-2 config is enabled" in new Setup {
         implicit val hc = HeaderCarrier(extraHeaders = Seq(ACCEPT -> "application/vnd.hmrc.1.0+json"))
         val response = HttpResponse(200)
         val release2EnabledConfig = Configuration("charitable-giving-version-2.enabled" -> true)
         MockAppConfig.featureSwitch returns Some(release2EnabledConfig)
 
-        MockCharitableGivingConnector.put(s"/$VERSION_2${request.uri}", requestBody)
+        MockSelfAssessmentConnector.put(request.uri, requestBody)
           .returns(Future.successful(Right(response)))
 
         val result = await(service.put(requestBody))
         result shouldBe Right(response)
       }
 
-      "the request contains a version 2.0 header and release-2 config is disabled" in new Setup {
+      "the request contains a version 2.0 header and charitable-giving-version-2 config is disabled" in new Setup {
         implicit val hc = HeaderCarrier(extraHeaders = Seq(ACCEPT -> "application/vnd.hmrc.2.0+json"))
         val response = HttpResponse(200)
 
         val release2EnabledConfig = Configuration("charitable-giving-version-2.enabled" -> false)
         MockAppConfig.featureSwitch returns Some(release2EnabledConfig)
 
-        MockCharitableGivingConnector.put(request.uri, requestBody)
+        MockSelfAssessmentConnector.put(request.uri, requestBody)
           .returns(Future.successful(Right(response)))
 
         val result = await(service.put(requestBody))
         result shouldBe Right(response)
       }
 
-      "the request contains a version 2.0 header and release-2 config is enabled" in new Setup {
+      "the request contains a version 2.0 header and charitable-giving-version-2 config is enabled" in new Setup {
         implicit val hc = HeaderCarrier(extraHeaders = Seq(ACCEPT -> "application/vnd.hmrc.2.0+json"))
         val response = HttpResponse(200)
 
